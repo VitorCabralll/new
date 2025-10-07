@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Agent {
+  id                String         @id @default(cuid())
+  name              String
+  systemInstruction String
+  category          String?
+  version           String         @default("1.0")
+  quality           Float?
+  trainingExamples  Int            @default(0)
+  lastUsed          DateTime?
+  usageCount        Int            @default(0)
+  isActive          Boolean        @default(true)
+  metadata          String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @default(now()) @updatedAt
+  requestAudits     RequestAudit[]
+
+  @@index([category])
+  @@index([isActive])
+  @@index([lastUsed])
+}
+
+model RequestAudit {
+  id               String       @id @default(cuid())
+  sessionId        String       @unique
+  userId           String?
+  agentId          String
+  fileName         String
+  fileSize         Int
+  fileMD5          String
+  extractionMethod String
+  documentType     String?
+  totalTokens      Int          @default(0)
+  totalDuration    Int          @default(0)
+  cacheHit         Boolean      @default(false)
+  qualityScore     Float?
+  improved         Boolean      @default(false)
+  success          Boolean
+  errorMessage     String?
+  createdAt        DateTime     @default(now())
+  processLogs      ProcessLog[]
+  agent            Agent        @relation(fields: [agentId], references: [id])
+
+  @@index([createdAt])
+  @@index([agentId])
+  @@index([success])
+  @@index([sessionId])
+}
+
+model ProcessLog {
+  id           String       @id @default(cuid())
+  sessionId    String
+  stage        String
+  status       String
+  startTime    DateTime     @default(now())
+  endTime      DateTime?
+  duration     Int?
+  tokensUsed   Int?
+  metadata     String?
+  errorMessage String?
+  createdAt    DateTime     @default(now())
+  requestAudit RequestAudit @relation(fields: [sessionId], references: [sessionId])
+
+  @@index([sessionId])
+  @@index([stage])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Nova tabela: Sessões de geração (para iterações e refinamentos)
+model LegalSession {
+  id                   String             @id @default(cuid())
+  userId               String?
+
+  // Arquivo original
+  fileMD5              String
+  fileName             String
+  fileSize             Int
+
+  // Pipeline completo salvo (substitui cache volátil)
+  extractedText        String             // Texto OCR completo (interno)
+  documentAnalysis     String             // JSON: { type, parties, values, dates }
+  chunks               String?            // JSON: chunks (nullable se doc pequeno)
+  contextSummary       String?            // Resumo contextual
+
+  // Dados do sistema multi-agente (opcional)
+  multiAgentData       String?            // JSON: { analise, plano, avaliacoes, iteracoesRefinamento }
+
+  // Configuração usada
+  agentId              String
+  documentType         String
+  originalInstructions String
+
+  // Resultado e histórico
+  iterations           SessionIteration[]
+
+  // Metadata
+  status               String             @default("active") // active | archived
+  createdAt            DateTime           @default(now())
+  lastAccessedAt       DateTime           @default(now())
+
+  @@index([userId])
+  @@index([fileMD5])
+  @@index([agentId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([lastAccessedAt])
+}
+
+// Nova tabela: Iterações de uma sessão (histórico de refinamentos)
+model SessionIteration {
+  id                String       @id @default(cuid())
+  sessionId         String
+  userPrompt        String       // Ex: "Melhore a fundamentação legal"
+  result            String       // Texto gerado
+  tokensUsed        Int
+  parentIterationId String?      // Para bifurcações
+  createdAt         DateTime     @default(now())
+  session           LegalSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([createdAt])
+  @@index([parentIterationId])
+}

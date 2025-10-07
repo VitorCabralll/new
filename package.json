@@ -1,0 +1,29 @@
+{
+  "name": "assistente-jurídico-ia",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "dev:all": "start /b cmd /c \"cd backend && npm run dev\" && start /b npm run dev"
+  },
+  "dependencies": {
+    "@google/genai": "^1.20.0",
+    "docx": "^8.5.0",
+    "jspdf": "^3.0.3",
+    "pdfjs-dist": "^4.5.136",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "tesseract.js": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.6",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}

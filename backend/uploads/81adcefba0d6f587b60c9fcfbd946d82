@@ -1,0 +1,4 @@
+Este é um arquivo de texto que simula um PDF corrompido.
+Não é um PDF real, apenas um arquivo para testar o tratamento de erros.
+%PDF-1.4
+Esta linha simula um cabeçalho PDF mas o arquivo está corrompido.

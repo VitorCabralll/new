@@ -1,0 +1,36 @@
+{
+  "arquivo": "1028910-74.2024.8.11.0041 - CBA - Hab. Crédito Trab - Favorável + Honorarios.pdf",
+  "tipo": "manifestacao_honorarios",
+  "extraction": {
+    "method": "pdf-parse",
+    "time": 49,
+    "characters": 3976,
+    "words": 563
+  },
+  "analysis": {
+    "type": "Habilitação de Crédito",
+    "parties": "Requerente: (S): MARCELO PEREIRA FERNANDES, Requerente: ,  o  crédito, Requerido: (S): MJB VIGILÂNCIA E SEGURANÇA LTDA",
+    "values": "R$ 36.709,55, R$ 2.251,95, R$ 25.606,35",
+    "dates": "07/02/2022"
+  },
+  "detectionCorrect": true,
+  "chunking": {
+    "strategy": "no-chunking",
+    "totalChunks": 1,
+    "prioritizedChunks": 1,
+    "totalTokens": 994,
+    "time": 1,
+    "priorities": {
+      "high": 1
+    },
+    "avgRelevance": 1
+  },
+  "quality": {
+    "score": 9.5,
+    "issues": [],
+    "suggestions": [
+      "Use formatação adequada (negrito para termos importantes)"
+    ],
+    "isAcceptable": true
+  }
+}

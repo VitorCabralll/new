@@ -1,0 +1,36 @@
+{
+  "arquivo": "1016035-72.2024.8.11.0041 - CBA - Hab. Crédito Trab - intimação.pdf",
+  "tipo": "manifestacao_intimacao",
+  "extraction": {
+    "method": "pdf-parse",
+    "time": 221,
+    "characters": 5217,
+    "words": 745
+  },
+  "analysis": {
+    "type": "Habilitação de Crédito",
+    "parties": "Requerente: (S): PATRICIA RONDON MARTIN FRANCO, Requerido: (S): VERDE TRANSPORTES LTDA",
+    "values": "R$ 32.578,11, R$ 3.107,96",
+    "dates": "30/10/2019, 30/07/2020, 30/10/2019"
+  },
+  "detectionCorrect": true,
+  "chunking": {
+    "strategy": "no-chunking",
+    "totalChunks": 1,
+    "prioritizedChunks": 1,
+    "totalTokens": 1305,
+    "time": 2,
+    "priorities": {
+      "high": 1
+    },
+    "avgRelevance": 1
+  },
+  "quality": {
+    "score": 9.5,
+    "issues": [],
+    "suggestions": [
+      "Use formatação adequada (negrito para termos importantes)"
+    ],
+    "isAcceptable": true
+  }
+}

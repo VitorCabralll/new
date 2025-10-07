@@ -1,0 +1,38 @@
+{
+  "arquivo": "1028881-24.2024.8.11.0041 - CBA - Hab. Crédito - fav. ao pedido.pdf",
+  "tipo": "manifestacao_favoravel",
+  "extraction": {
+    "method": "pdf-parse",
+    "time": 63,
+    "characters": 4519,
+    "words": 667
+  },
+  "analysis": {
+    "type": "Processo Falimentar",
+    "parties": "Requerente: (S): MUNICÍPIO DE CUIABÁ, Requerido: (S): ACPI  ASSESSORIA,  CONSULTORIA,  PLANEJAMENTO  &",
+    "values": "R$ 177.056,78, R$ 10.281,64, R$ 134.948,26",
+    "dates": "06/08/2018, 06/08/2018"
+  },
+  "detectionCorrect": false,
+  "chunking": {
+    "strategy": "no-chunking",
+    "totalChunks": 1,
+    "prioritizedChunks": 1,
+    "totalTokens": 1130,
+    "time": 0,
+    "priorities": {
+      "high": 1
+    },
+    "avgRelevance": 1
+  },
+  "quality": {
+    "score": 8,
+    "issues": [
+      "Seções obrigatórias ausentes: MINISTÉRIO PÚBLICO"
+    ],
+    "suggestions": [
+      "Use formatação adequada (negrito para termos importantes)"
+    ],
+    "isAcceptable": false
+  }
+}

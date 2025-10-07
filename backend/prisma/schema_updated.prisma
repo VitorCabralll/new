@@ -1,0 +1,235 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// AGENTES - Sistema principal de agentes especializados
+// ============================================================================
+model Agent {
+  id                String    @id @default(cuid())
+  userId            String    // ID do usuário proprietário
+  name              String    // "Manifestações de Habilitação MT"
+  systemInstruction String    // Instruction gerada automaticamente
+  category          String    // "Manifestação do MP", "Petição Inicial", etc
+  jurisdiction      String?   // "Mato Grosso", "São Paulo", etc
+  legalArea         String?   // "Cível", "Criminal", "Trabalhista", etc
+  version           String    @default("1.0")
+  quality           Float?    // Score de qualidade do agente (0-10)
+  trainingExamples  Int       @default(0) // Quantidade de modelos usados
+  
+  // Metadata expandida (JSON)
+  // { patterns, structure, userInstructions, validation }
+  metadata          String?   
+  
+  // Timestamps
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now()) @updatedAt
+  lastUsed          DateTime?
+  usageCount        Int       @default(0)
+  isActive          Boolean   @default(true)
+  
+  // Relações
+  trainingModels    TrainingModel[]
+  usages            AgentUsage[]
+  improvements      AgentImprovement[]
+  requestAudits     RequestAudit[]
+  
+  @@index([userId])
+  @@index([category])
+  @@index([quality])
+  @@index([isActive])
+  @@index([lastUsed])
+}
+
+// ============================================================================
+// MODELOS DE TREINAMENTO - Documentos exemplares fornecidos pelo usuário
+// ============================================================================
+model TrainingModel {
+  id              String   @id @default(cuid())
+  agentId         String
+  fileName        String   // Nome original do arquivo
+  filePath        String   // Caminho no storage (S3 ou local)
+  fileHash        String   @unique // MD5 para evitar duplicatas
+  fileSize        Int      // Tamanho em bytes
+  
+  // Análise completa do modelo (JSON)
+  // { structure, entities, style, legalCitations, keyPhrases, wordCount }
+  analysisData    String   
+  
+  // Metadata
+  uploadedAt      DateTime @default(now())
+  description     String?  // Descrição fornecida pelo usuário
+  qualityScore    Float?   // Score de qualidade do modelo (0-10)
+  
+  agent           Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  @@index([agentId])
+  @@index([fileHash])
+  @@index([uploadedAt])
+}
+
+// ============================================================================
+// HISTÓRICO DE USO - Rastreamento de cada geração de documento
+// ============================================================================
+model AgentUsage {
+  id                String    @id @default(cuid())
+  agentId           String
+  userId            String
+  
+  inputFileName     String    // Nome do arquivo de entrada
+  inputHash         String    // Hash do documento de entrada
+  outputHash        String    // Hash do documento gerado
+  
+  // Feedback do usuário
+  userRating        Float?    // 0-10
+  userFeedback      String?   // Comentários livres
+  corrections       String?   // Correções manuais feitas
+  
+  // Métricas automáticas de qualidade
+  processingTime    Int       // Tempo em milliseconds
+  qualityScore      Float     // Score automático (0-10)
+  structureMatch    Float?    // % similaridade de estrutura com modelos
+  styleMatch        Float?    // % similaridade de estilo com modelos
+  citationAccuracy  Float?    // % acurácia de citações
+  
+  timestamp         DateTime  @default(now())
+  
+  agent             Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  @@index([agentId])
+  @@index([userId])
+  @@index([timestamp])
+  @@index([userRating])
+  @@index([qualityScore])
+}
+
+// ============================================================================
+// MELHORIAS DO AGENTE - Histórico de evoluções e retreinamentos
+// ============================================================================
+model AgentImprovement {
+  id              String   @id @default(cuid())
+  agentId         String
+  
+  oldVersion      String
+  newVersion      String
+  
+  improvementType String   // 'AUTO_RETRAIN' | 'USER_FEEDBACK' | 'MANUAL' | 'NEW_MODEL'
+  changes         String   // JSON com detalhes das mudanças
+  
+  // Impacto da melhoria
+  qualityBefore   Float
+  qualityAfter    Float
+  improvementPct  Float    // Percentual de melhoria
+  
+  // Métricas antes e depois
+  metricsBefore   String?  // JSON
+  metricsAfter    String?  // JSON
+  
+  createdAt       DateTime @default(now())
+  triggeredBy     String?  // userId ou 'system'
+  
+  agent           Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  @@index([agentId])
+  @@index([createdAt])
+  @@index([improvementType])
+}
+
+// ============================================================================
+// AUDITORIA DE REQUISIÇÕES (já existente, mantido para compatibilidade)
+// ============================================================================
+model RequestAudit {
+  id               String       @id @default(cuid())
+  sessionId        String       @unique
+  userId           String?
+  agentId          String
+  fileName         String
+  fileSize         Int
+  fileMD5          String
+  extractionMethod String
+  documentType     String?
+  totalTokens      Int          @default(0)
+  totalDuration    Int          @default(0)
+  cacheHit         Boolean      @default(false)
+  qualityScore     Float?
+  improved         Boolean      @default(false)
+  success          Boolean
+  errorMessage     String?
+  createdAt        DateTime     @default(now())
+  processLogs      ProcessLog[]
+  agent            Agent        @relation(fields: [agentId], references: [id])
+
+  @@index([createdAt])
+  @@index([agentId])
+  @@index([success])
+  @@index([sessionId])
+}
+
+model ProcessLog {
+  id           String       @id @default(cuid())
+  sessionId    String
+  stage        String
+  status       String
+  startTime    DateTime     @default(now())
+  endTime      DateTime?
+  duration     Int?
+  tokensUsed   Int?
+  metadata     String?
+  errorMessage String?
+  createdAt    DateTime     @default(now())
+  requestAudit RequestAudit @relation(fields: [sessionId], references: [sessionId])
+
+  @@index([sessionId])
+  @@index([stage])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// SESSÕES LEGAIS (já existente, mantido para compatibilidade)
+// ============================================================================
+model LegalSession {
+  id                   String             @id @default(cuid())
+  userId               String?
+  fileMD5              String
+  fileName             String
+  fileSize             Int
+  extractedText        String
+  documentAnalysis     String
+  chunks               String?
+  contextSummary       String?
+  agentId              String
+  documentType         String
+  originalInstructions String
+  iterations           SessionIteration[]
+  status               String             @default("active")
+  createdAt            DateTime           @default(now())
+  lastAccessedAt       DateTime           @default(now())
+
+  @@index([userId])
+  @@index([fileMD5])
+  @@index([agentId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([lastAccessedAt])
+}
+
+model SessionIteration {
+  id                String       @id @default(cuid())
+  sessionId         String
+  userPrompt        String
+  result            String
+  tokensUsed        Int
+  parentIterationId String?
+  createdAt         DateTime     @default(now())
+  session           LegalSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([createdAt])
+  @@index([parentIterationId])
+}

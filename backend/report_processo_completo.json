@@ -1,0 +1,39 @@
+{
+  "arquivo": "1040464-06.2024.8.11.0041-1734122764279-4062496-processo.pdf",
+  "tipo": "processo_completo",
+  "extraction": {
+    "method": "pdf-parse",
+    "time": 456,
+    "characters": 111391,
+    "words": 14522
+  },
+  "analysis": {
+    "type": "Habilitação de Crédito",
+    "parties": "Requerente: ), Requerente: é  credora  da  empresa recuperanda na, Requerente: , procuração, declaração de, Requerente: para depósito do crédito, conforme poderes concedidos na procuração:, Requerente: dos benefícios da",
+    "values": "R$ 5.870,20, R$ 5.870,20, R$ 5.870,20",
+    "dates": "13/12/2024, 10/09/2024, 10/09/2024"
+  },
+  "detectionCorrect": false,
+  "chunking": {
+    "strategy": "structural",
+    "totalChunks": 21,
+    "prioritizedChunks": 21,
+    "totalTokens": 27854,
+    "time": 13,
+    "priorities": {
+      "critical": 21
+    },
+    "avgRelevance": 1
+  },
+  "quality": {
+    "score": 0.5,
+    "issues": [
+      "Seções obrigatórias ausentes: Meritíssimo, manifesta-se",
+      "Padrões inadequados encontrados: [1]",
+      "Padrões inadequados encontrados: todo, todo, todo",
+      "Cabeçalho institucional ausente ou incompleto"
+    ],
+    "suggestions": [],
+    "isAcceptable": false
+  }
+}

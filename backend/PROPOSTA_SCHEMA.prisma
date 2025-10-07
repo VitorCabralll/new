@@ -1,0 +1,181 @@
+// ============================================
+// PROPOSTA DE SCHEMA - Sistema de Agentes Treináveis
+// ============================================
+
+// ===== AGENTES DO USUÁRIO (Treináveis) =====
+
+model UserAgent {
+  id          String   @id @default(cuid())
+  userId      String   // Dono do agente
+  name        String   // "Meu Agente - Habilitação de Crédito"
+  description String?
+
+  // Configuração base
+  category    String   // "Habilitação de Crédito", "Recurso Criminal", etc.
+  basePrompt  String   // Instrução base do usuário
+
+  // Status de treinamento
+  isTrained        Boolean @default(false)
+  trainingExamples Int     @default(0)
+  lastTrainedAt    DateTime?
+
+  // Métricas
+  qualityScore     Float?  // Score médio das gerações
+  usageCount       Int     @default(0)
+  successRate      Float?  // % de gerações aceitas
+
+  // Relacionamentos
+  trainingDocs     TrainingDocument[]
+  templates        AgentTemplate[]
+  sessions         LegalSession[]
+
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([category])
+  @@index([isTrained])
+}
+
+// ===== DOCUMENTOS DE TREINAMENTO =====
+
+model TrainingDocument {
+  id            String    @id @default(cuid())
+  userAgentId   String
+  userAgent     UserAgent @relation(fields: [userAgentId], references: [id], onDelete: Cascade)
+
+  // Arquivo original
+  fileName      String
+  fileType      String    // "manifestacao", "peticao", "parecer"
+  fileMD5       String
+
+  // Conteúdo
+  fullText      String    // Texto completo
+  extractedData String    // JSON: { estrutura, seções, linguagem, padrões }
+
+  // Embeddings para busca semântica (futuro)
+  embedding     String?   // JSON: vector embeddings
+
+  // Metadados extraídos
+  metadata      String?   // JSON: { tipo_credito, valor_medio, complexidade, etc. }
+
+  // Status
+  processed     Boolean   @default(false)
+  qualityCheck  String?   // "approved", "rejected", "needs_review"
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userAgentId])
+  @@index([fileType])
+  @@index([processed])
+}
+
+// ===== TEMPLATES EXTRAÍDOS (Padrões Aprendidos) =====
+
+model AgentTemplate {
+  id            String    @id @default(cuid())
+  userAgentId   String
+  userAgent     UserAgent @relation(fields: [userAgentId], references: [id], onDelete: Cascade)
+
+  // Tipo de template
+  templateType  String    // "estrutura", "introducao", "fundamentacao", "conclusao"
+
+  // Padrão aprendido
+  pattern       String    // Template com placeholders: "{{habilitante}} requer..."
+  variables     String    // JSON: ["habilitante", "valor", "processo"]
+
+  // Metadados
+  confidence    Float     // Confiança do padrão (0-1)
+  usageCount    Int       @default(0)
+  successRate   Float?    // Taxa de sucesso quando usado
+
+  // Contexto de uso
+  applicableWhen String?  // JSON: { "tipo_credito": "quirografario", "valor_min": 1000 }
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userAgentId])
+  @@index([templateType])
+  @@index([confidence])
+}
+
+// ===== AGENTES DO SISTEMA (Fixos) =====
+
+model SystemAgent {
+  id                String   @id @default(cuid())
+  role              String   @unique // "analista", "planejador", "revisor"
+  name              String
+  systemInstruction String   // Prompt genérico e universal
+  version           String   @default("1.0")
+
+  // Configuração
+  model             String   @default("gemini-2.0-flash")
+  temperature       Float    @default(0.3)
+  maxTokens         Int      @default(8192)
+
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([role])
+  @@index([isActive])
+}
+
+// ===== SESSÕES (Modificado) =====
+
+model LegalSession {
+  id            String   @id @default(cuid())
+  userId        String
+  userAgentId   String   // ← Agora referencia UserAgent
+
+  // Pipeline salvo
+  extractedText        String
+  documentAnalysis     String  // JSON: análise do Analista Universal
+  planningData         String  // JSON: plano do Planejador Universal
+
+  // Contexto de aprendizado
+  similarExamples      String? // JSON: IDs dos TrainingDocuments similares
+  appliedTemplates     String? // JSON: Templates usados na geração
+  contextVariables     String? // JSON: Variáveis extraídas do caso
+
+  // Resultado
+  iterations    SessionIteration[]
+
+  status        String   @default("active")
+  createdAt     DateTime @default(now())
+  lastAccessedAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userAgentId])
+  @@index([createdAt])
+}
+
+// SessionIteration mantém igual...
+
+// ===== AUDITORIA (Modificado) =====
+
+model RequestAudit {
+  id               String   @id @default(cuid())
+  sessionId        String   @unique
+  userId           String?
+  userAgentId      String?  // ← Mudou de agentId para userAgentId
+
+  // Métricas de aprendizado
+  templatesUsed    Int      @default(0)
+  similarityScore  Float?   // Similaridade com modelos de treino
+  adaptationScore  Float?   // Quão bem adaptou ao caso específico
+
+  // ... resto igual
+  fileName         String
+  fileSize         Int
+  totalTokens      Int      @default(0)
+  qualityScore     Float?
+  success          Boolean
+  createdAt        DateTime @default(now())
+
+  @@index([userAgentId])
+  @@index([createdAt])
+}
