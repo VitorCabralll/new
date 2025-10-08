@@ -9,6 +9,7 @@ import { GoogleGenAI } from '@google/genai';
 import { prisma } from '../lib/prisma.js';
 import { ModelAnalyzer, ModelAnalysis, CommonPatterns } from './modelAnalyzer.js';
 import { extractTextFromPDF } from './textExtractor.js';
+import { TemplateExtractor } from './templateExtractor.js'; // ← NOVO
 import fs from 'fs/promises';
 import crypto from 'crypto';
 
@@ -88,6 +89,135 @@ export class AgentTrainingService {
   constructor() {
     this.genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
     this.analyzer = new ModelAnalyzer();
+  }
+
+  /**
+   * NOVO: Treinar UserAgent (em vez de Agent)
+   */
+  async trainUserAgent(
+    config: AgentCreationConfig & { userId: string }
+  ): Promise<TrainedAgent> {
+    console.log(`\n🎓 INICIANDO TREINAMENTO DO USER AGENT: ${config.name}\n`);
+    console.log('=' .repeat(70));
+
+    try {
+      // 1. EXTRAÇÃO DE TEXTO DOS MODELOS
+      console.log('\n📄 Passo 1/8: Extraindo texto dos modelos...');
+      const modelTexts = await this.extractModelsText(config.modelFiles);
+      console.log(`✅ ${modelTexts.length} modelos extraídos com sucesso`);
+
+      // 2. ANÁLISE DOS MODELOS
+      console.log('\n🔬 Passo 2/8: Analisando modelos...');
+      const { analyses, patterns } = await this.analyzer.analyzeMultipleModels(
+        modelTexts,
+        config.modelFiles.map(f => f.originalName)
+      );
+
+      const avgQuality = analyses.reduce((s, a) => s + a.qualityScore, 0) / analyses.length;
+      console.log(`✅ Análise concluída. Qualidade média dos modelos: ${avgQuality.toFixed(1)}/10`);
+
+      // Validar qualidade mínima dos modelos
+      if (avgQuality < 6.0) {
+        throw new Error(
+          `Qualidade dos modelos muito baixa (${avgQuality.toFixed(1)}/10). ` +
+          `Por favor, forneça modelos de melhor qualidade (mínimo 6.0/10).`
+        );
+      }
+
+      // 3. SÍNTESE DE ESTRUTURA IDEAL
+      console.log('\n🏗️  Passo 3/8: Sintetizando estrutura ideal...');
+      const idealStructure = this.synthesizeIdealStructure(patterns);
+      console.log(`✅ Estrutura sintetizada: ${idealStructure.mandatorySections.length} seções obrigatórias`);
+
+      // 4. GERAÇÃO AUTOMÁTICA DE SYSTEM INSTRUCTION
+      console.log('\n🤖 Passo 4/8: Gerando system instruction via Gemini...');
+      let systemInstruction = await this.generateSystemInstruction(
+        config,
+        patterns,
+        idealStructure
+      );
+      console.log(`✅ System instruction gerada (${systemInstruction.length} caracteres)`);
+
+      // 5. VALIDAÇÃO (se documento de teste fornecido)
+      let validation: ValidationResult | undefined;
+      if (config.testDocument) {
+        console.log('\n✅ Passo 5/8: Validando com documento de teste...');
+        validation = await this.validateWithTestDocument(
+          systemInstruction,
+          config.testDocument,
+          analyses
+        );
+
+        console.log(`Resultado da validação: ${validation.score.toFixed(1)}/10`);
+
+        // 6. REFINAMENTO (se necessário)
+        if (!validation.isAcceptable && validation.score < 8.0) {
+          console.log('\n🔧 Passo 6/8: Refinando instruction...');
+          systemInstruction = await this.refineInstruction(
+            systemInstruction,
+            validation,
+            analyses
+          );
+
+          // Re-validar
+          validation = await this.validateWithTestDocument(
+            systemInstruction,
+            config.testDocument,
+            analyses
+          );
+          console.log(`Qualidade após refinamento: ${validation.score.toFixed(1)}/10`);
+        } else {
+          console.log('\n✅ Passo 6/8: Instruction já está com qualidade adequada (não precisa refinar)');
+        }
+      } else {
+        console.log('\n⏭️  Passo 5/8: Pulado (sem documento de teste)');
+        console.log('⏭️  Passo 6/8: Pulado (sem documento de teste)');
+      }
+
+      // 7. CRIAR USER AGENT NO BANCO
+      console.log('\n💾 Passo 7/8: Criando UserAgent no banco de dados...');
+      const userAgent = await this.saveUserAgent(
+        config,
+        systemInstruction,
+        analyses,
+        patterns,
+        validation
+      );
+
+      console.log(`✅ UserAgent criado! ID: ${userAgent.id}`);
+
+      // 8. SALVAR TRAINING DOCUMENTS E EXTRAIR TEMPLATES
+      console.log('\n📚 Passo 8/8: Salvando modelos de treinamento e extraindo templates...');
+      await this.saveTrainingDocumentsAndTemplates(
+        userAgent.id,
+        config.modelFiles,
+        modelTexts,
+        analyses,
+        config.documentType
+      );
+      console.log(`✅ ${config.modelFiles.length} modelos de treinamento salvos`);
+
+      console.log('\n' + '=' .repeat(70));
+      console.log('🎉 TREINAMENTO CONCLUÍDO COM SUCESSO!\n');
+
+      return {
+        agentId: userAgent.id,
+        name: userAgent.name,
+        systemInstruction: userAgent.systemInstruction,
+        quality: userAgent.qualityScore || avgQuality,
+        trainingExamples: userAgent.trainingExamples,
+        validation,
+        metadata: {
+          patterns,
+          modelQualityScores: analyses.map(a => a.qualityScore),
+          avgModelQuality: avgQuality
+        }
+      };
+
+    } catch (error) {
+      console.error('\n❌ ERRO NO TREINAMENTO:', error);
+      throw error;
+    }
   }
   
   /**
@@ -607,7 +737,7 @@ Retorne APENAS a SYSTEM INSTRUCTION refinada, sem explicações.
     // Por enquanto, apenas registrar no log
     // Os dados já estão no metadata do agente
     console.log(`  💾 Modelos de treinamento salvos no metadata do agente ${agentId}`);
-    
+
     // TODO: Se precisar tabela separada, adicionar ao schema:
     // model TrainingModel {
     //   id           String   @id @default(cuid())
@@ -620,5 +750,136 @@ Retorne APENAS a SYSTEM INSTRUCTION refinada, sem explicações.
     //   qualityScore Float
     //   uploadedAt   DateTime @default(now())
     // }
+  }
+
+  /**
+   * NOVO: Salvar UserAgent no banco
+   */
+  private async saveUserAgent(
+    config: AgentCreationConfig & { userId: string },
+    systemInstruction: string,
+    analyses: ModelAnalysis[],
+    patterns: CommonPatterns,
+    validation?: ValidationResult
+  ) {
+    const avgQuality = validation?.score ||
+      analyses.reduce((s, a) => s + a.qualityScore, 0) / analyses.length;
+
+    return await prisma.userAgent.create({
+      data: {
+        userId: config.userId,
+        name: config.name,
+        description: config.description,
+        category: config.documentType,
+        basePrompt: config.customInstructions,
+        systemInstruction,
+        isTrained: true,
+        trainingExamples: config.modelFiles.length,
+        lastTrainedAt: new Date(),
+        qualityScore: avgQuality,
+        version: '1.0',
+        isActive: true,
+        metadata: JSON.stringify({
+          jurisdiction: config.jurisdiction,
+          legalArea: config.legalArea,
+          patterns,
+          userInstructions: config.customInstructions,
+          tone: config.tone,
+          emphasis: config.emphasis,
+          validation,
+          modelQualityScores: analyses.map(a => a.qualityScore),
+          modelAnalysesSummary: analyses.map(a => ({
+            sectionsCount: a.structure.sections.length,
+            citationsCount: a.legalCitations.length,
+            formalityScore: a.style.formalityScore,
+            wordCount: a.wordCount
+          })),
+          createdAt: new Date().toISOString()
+        })
+      }
+    });
+  }
+
+  /**
+   * NOVO: Salvar TrainingDocuments e extrair templates
+   */
+  private async saveTrainingDocumentsAndTemplates(
+    userAgentId: string,
+    modelFiles: AgentCreationConfig['modelFiles'],
+    modelTexts: string[],
+    analyses: ModelAnalysis[],
+    documentType: string
+  ) {
+    const templateExtractor = new TemplateExtractor(process.env.GEMINI_API_KEY || '');
+
+    for (let i = 0; i < modelFiles.length; i++) {
+      const file = modelFiles[i];
+      const text = modelTexts[i];
+      const analysis = analyses[i];
+
+      // 1. Calcular MD5
+      const md5 = crypto.createHash('md5').update(text).digest('hex');
+
+      // 2. Salvar TrainingDocument
+      const trainingDoc = await prisma.trainingDocument.create({
+        data: {
+          userAgentId,
+          fileName: file.originalName,
+          fileType: 'manifestacao', // Pode ser derivado do analysis
+          filePath: file.path,
+          fileMD5: md5,
+          fileSize: file.size,
+          fullText: text,
+          extractedData: JSON.stringify(analysis),
+          qualityScore: analysis.qualityScore,
+          processed: true,
+          qualityCheck: analysis.qualityScore >= 7.0 ? 'approved' : 'needs_review',
+          metadata: JSON.stringify({
+            tipoDocumento: documentType,
+            wordCount: analysis.wordCount,
+            sectionsCount: analysis.structure.sections.length,
+            citationsCount: analysis.legalCitations.length
+          })
+        }
+      });
+
+      console.log(`  ✓ TrainingDocument ${i + 1}/${modelFiles.length}: ${file.originalName} (${md5.substring(0, 8)}...)`);
+
+      // 3. Extrair templates deste modelo
+      console.log(`  📝 Extraindo templates de: ${file.originalName}...`);
+      const extractedTemplates = await templateExtractor.extrairTemplates(text, documentType);
+
+      if (extractedTemplates.length > 0) {
+        console.log(`  ✓ ${extractedTemplates.length} templates extraídos`);
+
+        // 4. Salvar templates no banco
+        for (const template of extractedTemplates) {
+          await prisma.agentTemplate.create({
+            data: {
+              userAgentId,
+              templateType: template.type,
+              pattern: template.pattern,
+              variables: JSON.stringify(template.variables),
+              exampleText: template.exampleText,
+              confidence: template.confidence,
+              applicableWhen: template.applicableWhen ? JSON.stringify(template.applicableWhen) : null
+            }
+          });
+        }
+
+        console.log(`  ✓ Templates salvos no banco`);
+      } else {
+        console.log(`  ⚠ Nenhum template extraído de ${file.originalName}`);
+      }
+    }
+
+    // Resumo
+    const totalTemplates = await prisma.agentTemplate.count({
+      where: { userAgentId }
+    });
+
+    console.log(`\n📊 Resumo do treinamento:`);
+    console.log(`  - Training Documents: ${modelFiles.length}`);
+    console.log(`  - Templates extraídos: ${totalTemplates}`);
   }
 }

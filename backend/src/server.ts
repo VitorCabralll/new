@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import agentRoutes from './routes/agents.js';
 import generateRoutes from './routes/generate.js';
+import generateV2Routes from './routes/generateV2.js'; // ← NOVO: Sistema de agentes treináveis
 import generateInstructionRoutes from './routes/generateInstruction.js';
 import auditRoutes from './routes/audit.js';
 import sessionRoutes from './routes/sessions.js';
@@ -15,7 +16,8 @@ app.use(express.json()); // Habilita o parsing de JSON no corpo das requisiçõe
 
 // Rotas da API
 app.use('/api', agentRoutes);
-app.use('/api', generateRoutes);
+app.use('/api', generateRoutes); // Sistema antigo (compatibilidade)
+app.use('/api', generateV2Routes); // ← NOVO: Sistema de agentes treináveis
 app.use('/api', generateInstructionRoutes);
 app.use('/api', auditRoutes);
 app.use('/api/sessions', sessionRoutes);

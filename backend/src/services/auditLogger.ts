@@ -53,6 +53,11 @@ interface StageMetadata {
     error?: string;
     fallback?: boolean;
   };
+  planning: {
+    secoesCount?: number;
+    posicionamento?: string;
+  };
+  [key: string]: any; // Allow dynamic stage names (review-1, refinement-1, etc.)
 }
 
 type StageNames = keyof StageMetadata;
@@ -99,7 +104,7 @@ export class AuditLogger {
   /**
    * Registra o início de um stage
    */
-  async logStageStart(stage: StageNames): Promise<void> {
+  async logStageStart(stage: string): Promise<void> {
     const startTime = Date.now();
     this.startTimes.set(stage, startTime);
 
@@ -116,9 +121,9 @@ export class AuditLogger {
   /**
    * Registra a conclusão bem-sucedida de um stage
    */
-  async logStageComplete<T extends StageNames>(
-    stage: T,
-    metadata: StageMetadata[T],
+  async logStageComplete(
+    stage: string,
+    metadata: any,
     tokensUsed?: number
   ): Promise<void> {
     const startTime = this.startTimes.get(stage);
@@ -177,7 +182,7 @@ export class AuditLogger {
   /**
    * Registra um erro em um stage
    */
-  async logStageError(stage: StageNames, error: Error): Promise<void> {
+  async logStageError(stage: string, error: Error): Promise<void> {
     const startTime = this.startTimes.get(stage);
     const endTime = Date.now();
     const duration = startTime ? endTime - startTime : null;
@@ -198,7 +203,7 @@ export class AuditLogger {
   /**
    * Registra cache hit
    */
-  async logCacheHit(stage: StageNames): Promise<void> {
+  async logCacheHit(stage: string): Promise<void> {
     await prisma.processLog.create({
       data: {
         sessionId: this.sessionId,
@@ -326,7 +331,7 @@ export async function getSystemStats(days: number = 7): Promise<{
   const totalDuration = requests.reduce((sum, r) => sum + r.totalDuration, 0);
 
   const agentUsage = requests.reduce((acc, r) => {
-    const name = r.agent.name;
+    const name = r.agent?.name || 'unknown';
     acc[name] = (acc[name] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);

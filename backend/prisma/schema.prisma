@@ -7,6 +7,144 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ===== AGENTES DO SISTEMA (Fixos e Universais) =====
+model SystemAgent {
+  id                String   @id @default(cuid())
+  role              String   @unique // "analista", "planejador", "revisor"
+  name              String
+  systemInstruction String   // Prompt genérico e universal
+  version           String   @default("1.0")
+
+  // Configuração
+  model             String   @default("gemini-2.0-flash")
+  temperature       Float    @default(0.3)
+  maxTokens         Int      @default(8192)
+
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([role])
+  @@index([isActive])
+}
+
+// ===== AGENTES DO USUÁRIO (Treináveis) =====
+model UserAgent {
+  id          String   @id @default(cuid())
+  userId      String   // Dono do agente
+  name        String   // "Meu Agente - Habilitação de Crédito"
+  description String?
+
+  // Configuração base
+  category    String   // "Habilitação de Crédito", "Recurso Criminal", etc.
+  basePrompt  String   // Instrução base do usuário
+
+  // System instruction gerada (do treinamento)
+  systemInstruction String
+
+  // Status de treinamento
+  isTrained        Boolean @default(false)
+  trainingExamples Int     @default(0)
+  lastTrainedAt    DateTime?
+
+  // Métricas
+  version          String   @default("1.0")
+  qualityScore     Float?   // Score médio das gerações
+  usageCount       Int      @default(0)
+  lastUsed         DateTime?
+  successRate      Float?   // % de gerações aceitas
+
+  // Relacionamentos
+  trainingDocs     TrainingDocument[]
+  templates        AgentTemplate[]
+  sessions         LegalSession[]
+  requestAudits    RequestAudit[]
+
+  isActive    Boolean  @default(true)
+  metadata    String?  // JSON: patterns, validation, etc.
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([category])
+  @@index([isTrained])
+  @@index([isActive])
+  @@index([lastUsed])
+}
+
+// ===== DOCUMENTOS DE TREINAMENTO =====
+model TrainingDocument {
+  id            String    @id @default(cuid())
+  userAgentId   String
+  userAgent     UserAgent @relation(fields: [userAgentId], references: [id], onDelete: Cascade)
+
+  // Arquivo original
+  fileName      String
+  fileType      String    // "manifestacao", "peticao", "parecer"
+  filePath      String?   // Path relativo ao upload
+  fileMD5       String
+  fileSize      Int
+
+  // Conteúdo
+  fullText      String    // Texto completo extraído
+  extractedData String    // JSON: { estrutura, seções, linguagem, padrões }
+
+  // Embeddings para busca semântica (futuro)
+  embedding     String?   // JSON: vector embeddings
+
+  // Metadados extraídos automaticamente
+  metadata      String?   // JSON: { tipo_credito, valor_medio, complexidade, etc. }
+
+  // Análise de qualidade
+  qualityScore  Float?    // Score do modelo (0-10)
+
+  // Status
+  processed     Boolean   @default(false)
+  qualityCheck  String?   // "approved", "rejected", "needs_review"
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userAgentId])
+  @@index([fileType])
+  @@index([processed])
+  @@index([fileMD5])
+}
+
+// ===== TEMPLATES EXTRAÍDOS (Padrões Aprendidos) =====
+model AgentTemplate {
+  id            String    @id @default(cuid())
+  userAgentId   String
+  userAgent     UserAgent @relation(fields: [userAgentId], references: [id], onDelete: Cascade)
+
+  // Tipo de template
+  templateType  String    // "introducao", "fundamentacao", "conclusao", "calculo_divergente", etc.
+
+  // Padrão aprendido
+  pattern       String    // Template com placeholders: "{{habilitante}} requer..."
+  variables     String    // JSON: ["habilitante", "valor", "processo"]
+
+  // Exemplo original (opcional)
+  exampleText   String?   // Trecho original de onde foi extraído
+
+  // Metadados
+  confidence    Float     @default(0.5) // Confiança do padrão (0-1)
+  usageCount    Int       @default(0)
+  successRate   Float?    // Taxa de sucesso quando usado
+
+  // Contexto de uso
+  applicableWhen String?  // JSON: { "tipo_credito": "quirografario", "has_divergencia": true }
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userAgentId])
+  @@index([templateType])
+  @@index([confidence])
+}
+
+// ===== COMPATIBILIDADE (deprecado - manter por enquanto) =====
+// @deprecated - Use UserAgent
 model Agent {
   id                String         @id @default(cuid())
   name              String
@@ -32,7 +170,11 @@ model RequestAudit {
   id               String       @id @default(cuid())
   sessionId        String       @unique
   userId           String?
-  agentId          String
+
+  // Suporta tanto Agent quanto UserAgent (para compatibilidade)
+  agentId          String       // @deprecated - Agent antigo
+  userAgentId      String?      // UserAgent novo (opcional durante transição)
+
   fileName         String
   fileSize         Int
   fileMD5          String
@@ -45,12 +187,22 @@ model RequestAudit {
   improved         Boolean      @default(false)
   success          Boolean
   errorMessage     String?
+
+  // Métricas de aprendizado (novos)
+  templatesUsed    Int?         // Quantos templates foram usados
+  similarityScore  Float?       // Similaridade com modelos de treino (0-1)
+  adaptationScore  Float?       // Quão bem adaptou ao caso (0-1)
+
   createdAt        DateTime     @default(now())
   processLogs      ProcessLog[]
-  agent            Agent        @relation(fields: [agentId], references: [id])
+
+  // Relacionamentos (compatibilidade)
+  agent            Agent?       @relation(fields: [agentId], references: [id])
+  userAgent        UserAgent?   @relation(fields: [userAgentId], references: [id])
 
   @@index([createdAt])
   @@index([agentId])
+  @@index([userAgentId])
   @@index([success])
   @@index([sessionId])
 }
@@ -94,13 +246,22 @@ model LegalSession {
   // Dados do sistema multi-agente (opcional)
   multiAgentData       String?            // JSON: { analise, plano, avaliacoes, iteracoesRefinamento }
 
-  // Configuração usada
-  agentId              String
+  // Configuração usada (compatibilidade Agent + UserAgent)
+  agentId              String?            // @deprecated - Agent antigo (opcional)
+  userAgentId          String?            // UserAgent novo
   documentType         String
   originalInstructions String
 
+  // Contexto de aprendizado (novo)
+  similarExamples      String?            // JSON: IDs dos TrainingDocuments similares
+  appliedTemplates     String?            // JSON: Templates usados na geração
+  contextVariables     String?            // JSON: Variáveis extraídas do caso
+
   // Resultado e histórico
   iterations           SessionIteration[]
+
+  // Relacionamentos
+  userAgent            UserAgent?         @relation(fields: [userAgentId], references: [id])
 
   // Metadata
   status               String             @default("active") // active | archived
@@ -110,6 +271,7 @@ model LegalSession {
   @@index([userId])
   @@index([fileMD5])
   @@index([agentId])
+  @@index([userAgentId])
   @@index([status])
   @@index([createdAt])
   @@index([lastAccessedAt])

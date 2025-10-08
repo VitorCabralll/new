@@ -68,6 +68,10 @@ router.post('/:id/refine', async (req, res) => {
     }
 
     // Buscar agente
+    if (!session.agentId) {
+      return res.status(404).json({ message: 'Sessão sem agente associado' });
+    }
+
     const agent = await prisma.agent.findUnique({
       where: { id: session.agentId }
     });
