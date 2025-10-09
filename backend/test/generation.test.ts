@@ -42,9 +42,19 @@ describe('POST /api/generate (Unified Endpoint)', () => {
 
   // 1. Popular o DB com SystemAgents e criar um UserAgent de teste
   beforeAll(async () => {
+    // Garantir que o banco de dados de teste esteja sincronizado com o schema
+    console.log('Syncing test database schema...');
+    execSync('npx prisma db push --accept-data-loss', {
+      stdio: 'inherit',
+      env: process.env,
+    });
+
     // Executar o seeder como um processo para garantir que o DB esteja pronto
     console.log('Seeding system agents for test...');
-    execSync('npx tsx prisma/seed-system-agents.ts', { stdio: 'inherit' });
+    execSync('npx tsx prisma/seed-system-agents.ts', {
+      stdio: 'inherit',
+      env: process.env, // Passa as variáveis de ambiente do processo pai
+    });
 
     // Limpeza robusta para lidar com execuções de teste anteriores com falha
     const oldTestAgent = await prisma.userAgent.findFirst({ where: { name: 'Test Agent for Generation' } });
