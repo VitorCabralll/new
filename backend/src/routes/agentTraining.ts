@@ -132,14 +132,14 @@ router.post(
 );
 
 // ============================================================================
-// POST /api/training/agents/:agentId/models - ADICIONAR MODELO A AGENTE EXISTENTE
+// POST /api/training/user-agents/:userAgentId/models - ADICIONAR MODELO A USER AGENT EXISTENTE
 // ============================================================================
 router.post(
-  '/training/agents/:agentId/models',
+  '/training/user-agents/:userAgentId/models',
   upload.single('modelFile'),
   async (req, res) => {
     try {
-      const { agentId } = req.params;
+      const { userAgentId } = req.params;
       const { description } = req.body;
       const modelFile = req.file;
 
@@ -150,21 +150,21 @@ router.post(
         });
       }
 
-      // Verificar se o agente existe
-      const agent = await prisma.agent.findUnique({
-        where: { id: agentId }
+      // Verificar se o User Agent existe
+      const userAgent = await prisma.userAgent.findUnique({
+        where: { id: userAgentId }
       });
 
-      if (!agent) {
+      if (!userAgent) {
         return res.status(404).json({
           success: false,
-          error: 'Agente não encontrado'
+          error: 'User Agent não encontrado'
         });
       }
 
-      console.log(`📁 Adicionando modelo ao agente ${agentId}: ${modelFile.originalname}`);
+      console.log(`📁 Adicionando modelo ao User Agent ${userAgentId}: ${modelFile.originalname}`);
 
-      // TODO: Implementar análise do novo modelo e atualização do agente
+      // TODO: Implementar análise do novo modelo e atualização do User Agent
       // Por enquanto, retornamos sucesso básico
 
       res.status(200).json({
@@ -188,14 +188,14 @@ router.post(
 );
 
 // ============================================================================
-// POST /api/training/agents/:agentId/generate - GERAR DOCUMENTO USANDO AGENTE
+// POST /api/training/user-agents/:userAgentId/generate - GERAR DOCUMENTO USANDO USER AGENT
 // ============================================================================
 router.post(
-  '/training/agents/:agentId/generate',
+  '/training/user-agents/:userAgentId/generate',
   upload.single('processDocument'),
   async (req, res) => {
     try {
-      const { agentId } = req.params;
+      const { userAgentId } = req.params;
       const { additionalInstructions } = req.body;
       const processDocument = req.file;
 
@@ -206,30 +206,30 @@ router.post(
         });
       }
 
-      // Buscar agente no banco
-      const agent = await prisma.agent.findUnique({
-        where: { id: agentId }
+      // Buscar User Agent no banco
+      const userAgent = await prisma.userAgent.findUnique({
+        where: { id: userAgentId }
       });
 
-      if (!agent) {
+      if (!userAgent) {
         return res.status(404).json({
           success: false,
-          error: 'Agente não encontrado'
+          error: 'User Agent não encontrado'
         });
       }
 
-      console.log(`📝 Gerando documento usando agente: ${agent.name}`);
+      console.log(`📝 Gerando documento usando User Agent: ${userAgent.name}`);
       console.log(`📄 Documento do processo: ${processDocument.originalname}`);
 
       const startTime = Date.now();
 
-      // TODO: Implementar geração real usando o agente e o documento
+      // TODO: Implementar geração real usando o User Agent e o documento
       // Por enquanto, retornamos um exemplo
 
       const generatedDocument = `
 MANIFESTAÇÃO DO MINISTÉRIO PÚBLICO
 
-[Documento gerado pelo agente: ${agent.name}]
+[Documento gerado pelo User Agent: ${userAgent.name}]
 [Baseado em: ${processDocument.originalname}]
 
 Este é um documento de exemplo gerado pelo sistema de treinamento de agentes.
@@ -243,8 +243,8 @@ Instruções adicionais: ${additionalInstructions || 'Nenhuma'}
       // VALIDAÇÃO AUTOMÁTICA
       let validation = null;
       try {
-        // Buscar modelos do metadata do agente
-        const metadata = agent.metadata ? JSON.parse(agent.metadata) : null;
+        // Buscar modelos do metadata do User Agent
+        const metadata = userAgent.metadata ? JSON.parse(userAgent.metadata) : null;
         
         if (metadata?.modelAnalysesSummary) {
           // Converter resumos em ModelAnalysis format
@@ -296,11 +296,11 @@ Instruções adicionais: ${additionalInstructions || 'Nenhuma'}
 );
 
 // ============================================================================
-// GET /api/training/agents - LISTAR AGENTES DE TREINAMENTO
+// GET /api/training/user-agents - LISTAR USER AGENTS DE TREINamento
 // ============================================================================
-router.get('/training/agents', async (req, res) => {
+router.get('/training/user-agents', async (req, res) => {
   try {
-    const { category, jurisdiction, minQuality } = req.query;
+    const { category, jurisdiction, minQualityScore } = req.query;
 
     const where: any = {};
     
@@ -313,23 +313,23 @@ router.get('/training/agents', async (req, res) => {
       // TODO: Implementar filtro de jurisdição no metadata JSON
     }
     
-    if (minQuality) {
-      where.quality = {
-        gte: parseFloat(minQuality as string)
+    if (minQualityScore) {
+      where.qualityScore = {
+        gte: parseFloat(minQualityScore as string)
       };
     }
 
-    const agents = await prisma.agent.findMany({
+    const userAgents = await prisma.userAgent.findMany({
       where,
       orderBy: [
-        { quality: 'desc' },
+        { qualityScore: 'desc' },
         { createdAt: 'desc' }
       ],
       select: {
         id: true,
         name: true,
         category: true,
-        quality: true,
+        qualityScore: true,
         trainingExamples: true,
         isActive: true,
         createdAt: true,
@@ -341,74 +341,74 @@ router.get('/training/agents', async (req, res) => {
     res.json({
       success: true,
       data: {
-        agents: agents.map(agent => ({
-          ...agent,
-          metadata: agent.metadata ? JSON.parse(agent.metadata) : null
+        userAgents: userAgents.map(userAgent => ({
+          ...userAgent,
+          metadata: userAgent.metadata ? JSON.parse(userAgent.metadata) : null
         })),
-        total: agents.length
+        total: userAgents.length
       }
     });
 
   } catch (error) {
-    console.error('❌ Erro ao listar agentes:', error);
+    console.error('❌ Erro ao listar User Agents:', error);
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Erro ao listar agentes'
+      error: error instanceof Error ? error.message : 'Erro ao listar User Agents'
     });
   }
 });
 
 // ============================================================================
-// GET /api/training/agents/:agentId - BUSCAR DETALHES DO AGENTE
+// GET /api/training/user-agents/:userAgentId - BUSCAR DETALHES DO USER AGENT
 // ============================================================================
-router.get('/training/agents/:agentId', async (req, res) => {
+router.get('/training/user-agents/:userAgentId', async (req, res) => {
   try {
-    const { agentId } = req.params;
+    const { userAgentId } = req.params;
 
-    const agent = await prisma.agent.findUnique({
-      where: { id: agentId }
+    const userAgent = await prisma.userAgent.findUnique({
+      where: { id: userAgentId }
     });
 
-    if (!agent) {
+    if (!userAgent) {
       return res.status(404).json({
         success: false,
-        error: 'Agente não encontrado'
+        error: 'User Agent não encontrado'
       });
     }
 
     res.json({
       success: true,
       data: {
-        ...agent,
-        metadata: agent.metadata ? JSON.parse(agent.metadata) : null
+        ...userAgent,
+        metadata: userAgent.metadata ? JSON.parse(userAgent.metadata) : null
       }
     });
 
   } catch (error) {
-    console.error('❌ Erro ao buscar agente:', error);
+    console.error('❌ Erro ao buscar User Agent:', error);
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Erro ao buscar agente'
+      error: error instanceof Error ? error.message : 'Erro ao buscar User Agent'
     });
   }
 });
 
 // ============================================================================
-// GET /api/training/agents/:agentId/metrics - BUSCAR MÉTRICAS DO AGENTE
+// GET /api/training/user-agents/:userAgentId/metrics - BUSCAR MÉTRICAS DO USER AGENT
 // ============================================================================
-router.get('/training/agents/:agentId/metrics', async (req, res) => {
+router.get('/training/user-agents/:userAgentId/metrics', async (req, res) => {
   try {
-    const { agentId } = req.params;
+    const { userAgentId } = req.params;
     const { period = '30d' } = req.query;
 
-    const agent = await prisma.agent.findUnique({
-      where: { id: agentId }
+    const userAgent = await prisma.userAgent.findUnique({
+      where: { id: userAgentId }
     });
 
-    if (!agent) {
+    if (!userAgent) {
       return res.status(404).json({
         success: false,
-        error: 'Agente não encontrado'
+        error: 'User Agent não encontrado'
       });
     }
 
@@ -418,8 +418,8 @@ router.get('/training/agents/:agentId/metrics', async (req, res) => {
     res.json({
       success: true,
       data: {
-        agentId: agent.id,
-        name: agent.name,
+        agentId: userAgent.id,
+        name: userAgent.name,
         
         usage: {
           totalUsages: 0,
@@ -428,7 +428,7 @@ router.get('/training/agents/:agentId/metrics', async (req, res) => {
         },
         
         quality: {
-          avgScore: agent.quality,
+          avgScore: userAgent.qualityScore,
           avgUserRating: 0,
           trend: 'stable'
         },
@@ -454,11 +454,11 @@ router.get('/training/agents/:agentId/metrics', async (req, res) => {
 });
 
 // ============================================================================
-// POST /api/training/agents/:agentId/feedback - ENVIAR FEEDBACK
+// POST /api/training/user-agents/:userAgentId/feedback - ENVIAR FEEDBACK
 // ============================================================================
-router.post('/training/agents/:agentId/feedback', async (req, res) => {
+router.post('/training/user-agents/:userAgentId/feedback', async (req, res) => {
   try {
-    const { agentId } = req.params;
+    const { userAgentId } = req.params;
     const { generationId, rating, feedback, corrections } = req.body;
 
     if (!rating || rating < 0 || rating > 10) {
@@ -468,18 +468,18 @@ router.post('/training/agents/:agentId/feedback', async (req, res) => {
       });
     }
 
-    const agent = await prisma.agent.findUnique({
-      where: { id: agentId }
+    const userAgent = await prisma.userAgent.findUnique({
+      where: { id: userAgentId }
     });
 
-    if (!agent) {
+    if (!userAgent) {
       return res.status(404).json({
         success: false,
-        error: 'Agente não encontrado'
+        error: 'User Agent não encontrado'
       });
     }
 
-    console.log(`📊 Feedback recebido para agente ${agent.name}: ${rating}/10`);
+    console.log(`📊 Feedback recebido para User Agent ${userAgent.name}: ${rating}/10`);
 
     // TODO: Salvar feedback no banco de dados
     // TODO: Implementar sistema de melhoria contínua
@@ -499,25 +499,25 @@ router.post('/training/agents/:agentId/feedback', async (req, res) => {
 });
 
 // ============================================================================
-// POST /api/training/agents/:agentId/retrain - RETREINAR AGENTE
+// POST /api/training/user-agents/:userAgentId/retrain - RETREINAR USER AGENT
 // ============================================================================
-router.post('/training/agents/:agentId/retrain', async (req, res) => {
+router.post('/training/user-agents/:userAgentId/retrain', async (req, res) => {
   try {
-    const { agentId } = req.params;
+    const { userAgentId } = req.params;
     const { useRecentCorrections, additionalInstructions } = req.body;
 
-    const agent = await prisma.agent.findUnique({
-      where: { id: agentId }
+    const userAgent = await prisma.userAgent.findUnique({
+      where: { id: userAgentId }
     });
 
-    if (!agent) {
+    if (!userAgent) {
       return res.status(404).json({
         success: false,
-        error: 'Agente não encontrado'
+        error: 'User Agent não encontrado'
       });
     }
 
-    console.log(`🔄 Iniciando retreinamento do agente: ${agent.name}`);
+    console.log(`🔄 Iniciando retreinamento do User Agent: ${userAgent.name}`);
 
     // TODO: Implementar lógica de retreinamento
     // - Buscar correções recentes se useRecentCorrections = true
@@ -531,8 +531,8 @@ router.post('/training/agents/:agentId/retrain', async (req, res) => {
       data: {
         oldVersion: '1.0',
         newVersion: '1.1',
-        qualityBefore: agent.quality,
-        qualityAfter: agent.quality, // Por enquanto, mesma qualidade
+        qualityBefore: userAgent.qualityScore,
+        qualityAfter: userAgent.qualityScore, // Por enquanto, mesma qualidade
         improvements: [
           'Retreinamento implementado - em breve!'
         ]
@@ -540,48 +540,48 @@ router.post('/training/agents/:agentId/retrain', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Erro ao retreinar agente:', error);
+    console.error('❌ Erro ao retreinar User Agent:', error);
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Erro ao retreinar agente'
+      error: error instanceof Error ? error.message : 'Erro ao retreinar User Agent'
     });
   }
 });
 
 // ============================================================================
-// DELETE /api/training/agents/:agentId - DELETAR AGENTE
+// DELETE /api/training/user-agents/:userAgentId - DELETAR USER AGENT
 // ============================================================================
-router.delete('/training/agents/:agentId', async (req, res) => {
+router.delete('/training/user-agents/:userAgentId', async (req, res) => {
   try {
-    const { agentId } = req.params;
+    const { userAgentId } = req.params;
 
-    const agent = await prisma.agent.findUnique({
-      where: { id: agentId }
+    const userAgent = await prisma.userAgent.findUnique({
+      where: { id: userAgentId }
     });
 
-    if (!agent) {
+    if (!userAgent) {
       return res.status(404).json({
         success: false,
-        error: 'Agente não encontrado'
+        error: 'User Agent não encontrado'
       });
     }
 
-    await prisma.agent.delete({
-      where: { id: agentId }
+    await prisma.userAgent.delete({
+      where: { id: userAgentId }
     });
 
-    console.log(`🗑️ Agente deletado: ${agent.name}`);
+    console.log(`🗑️ User Agent deletado: ${userAgent.name}`);
 
     res.json({
       success: true,
-      message: 'Agente deletado com sucesso'
+      message: 'User Agent deletado com sucesso'
     });
 
   } catch (error) {
-    console.error('❌ Erro ao deletar agente:', error);
+    console.error('❌ Erro ao deletar User Agent:', error);
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Erro ao deletar agente'
+      error: error instanceof Error ? error.message : 'Erro ao deletar User Agent'
     });
   }
 });

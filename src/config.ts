@@ -9,8 +9,7 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:30
 // API Endpoints
 export const API_ENDPOINTS = {
   generate: `${API_BASE_URL}/api/generate`,
-  generateInstruction: `${API_BASE_URL}/api/generate-instruction`,
-  agents: `${API_BASE_URL}/api/agents`,
+  userAgents: `${API_BASE_URL}/api/training/user-agents`, // Endpoint para listar UserAgents
   sessions: `${API_BASE_URL}/api/sessions`,
   audit: `${API_BASE_URL}/api/audit`,
 } as const;
