@@ -1,16 +1,16 @@
 import React from 'react';
-import { Agent } from '../types';
+import { UserAgent } from '../types'; // MUDANÇA
 import { PlusIcon } from './icons/PlusIcon';
 import { TrashIcon } from './icons/TrashIcon';
 import { Tooltip } from './Tooltip';
 import { BrainIcon } from './icons/BrainIcon';
 
 interface SidebarProps {
-  agents: Agent[];
-  activeAgent: Agent | null;
+  agents: UserAgent[]; // MUDANÇA
+  activeAgent: UserAgent | null; // MUDANÇA
   onSelectAgent: (id: string) => void;
-  onAddAgent: () => void;
-  onDeleteAgent: (agent: Agent) => void;
+  onAddAgent?: () => void; // MUDANÇA: Opcional
+  onDeleteAgent?: (agent: UserAgent) => void; // MUDANÇA: Opcional e tipo UserAgent
   isLoading: boolean;
   error: string | null;
 }
@@ -55,7 +55,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   {agent.name}
                 </button>
-                {agent.id !== 'default-generalist-1' && (
+                {/* MUDANÇA: Renderização condicional e sem verificação de ID default */}
+                {onDeleteAgent && (
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
                      <Tooltip text="Excluir Agente">
                         <button
@@ -72,15 +73,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </nav>
         )}
       </div>
-      <div className="p-4 border-t border-white/20">
-        <button
-          onClick={onAddAgent}
-          className="w-full btn-primary flex items-center justify-center px-4 py-3 rounded-xl text-sm font-semibold shadow-md hover:shadow-xl transition-all"
-        >
-          <PlusIcon className="h-5 w-5 mr-2" />
-          Novo Agente
-        </button>
-      </div>
+      {/* MUDANÇA: Renderização condicional */}
+      {onAddAgent && (
+        <div className="p-4 border-t border-white/20">
+          <button
+            onClick={onAddAgent}
+            className="w-full btn-primary flex items-center justify-center px-4 py-3 rounded-xl text-sm font-semibold shadow-md hover:shadow-xl transition-all"
+          >
+            <PlusIcon className="h-5 w-5 mr-2" />
+            Novo Agente
+          </button>
+        </div>
+      )}
     </aside>
   );
 };

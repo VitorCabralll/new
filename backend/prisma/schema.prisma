@@ -143,37 +143,13 @@ model AgentTemplate {
   @@index([confidence])
 }
 
-// ===== COMPATIBILIDADE (deprecado - manter por enquanto) =====
-// @deprecated - Use UserAgent
-model Agent {
-  id                String         @id @default(cuid())
-  name              String
-  systemInstruction String
-  category          String?
-  version           String         @default("1.0")
-  quality           Float?
-  trainingExamples  Int            @default(0)
-  lastUsed          DateTime?
-  usageCount        Int            @default(0)
-  isActive          Boolean        @default(true)
-  metadata          String?
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @default(now()) @updatedAt
-  requestAudits     RequestAudit[]
-
-  @@index([category])
-  @@index([isActive])
-  @@index([lastUsed])
-}
-
 model RequestAudit {
   id               String       @id @default(cuid())
   sessionId        String       @unique
   userId           String?
 
-  // Suporta tanto Agent quanto UserAgent (para compatibilidade)
-  agentId          String       // @deprecated - Agent antigo
-  userAgentId      String?      // UserAgent novo (opcional durante transição)
+  // Relacionamento unificado com o agente do usuário
+  userAgentId      String
 
   fileName         String
   fileSize         Int
@@ -196,12 +172,10 @@ model RequestAudit {
   createdAt        DateTime     @default(now())
   processLogs      ProcessLog[]
 
-  // Relacionamentos (compatibilidade)
-  agent            Agent?       @relation(fields: [agentId], references: [id])
-  userAgent        UserAgent?   @relation(fields: [userAgentId], references: [id])
+  // Relacionamento unificado
+  userAgent        UserAgent    @relation(fields: [userAgentId], references: [id])
 
   @@index([createdAt])
-  @@index([agentId])
   @@index([userAgentId])
   @@index([success])
   @@index([sessionId])
@@ -246,9 +220,8 @@ model LegalSession {
   // Dados do sistema multi-agente (opcional)
   multiAgentData       String?            // JSON: { analise, plano, avaliacoes, iteracoesRefinamento }
 
-  // Configuração usada (compatibilidade Agent + UserAgent)
-  agentId              String?            // @deprecated - Agent antigo (opcional)
-  userAgentId          String?            // UserAgent novo
+  // Configuração usada
+  userAgentId          String
   documentType         String
   originalInstructions String
 
@@ -261,7 +234,7 @@ model LegalSession {
   iterations           SessionIteration[]
 
   // Relacionamentos
-  userAgent            UserAgent?         @relation(fields: [userAgentId], references: [id])
+  userAgent            UserAgent          @relation(fields: [userAgentId], references: [id])
 
   // Metadata
   status               String             @default("active") // active | archived
@@ -270,7 +243,6 @@ model LegalSession {
 
   @@index([userId])
   @@index([fileMD5])
-  @@index([agentId])
   @@index([userAgentId])
   @@index([status])
   @@index([createdAt])

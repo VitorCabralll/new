@@ -1,7 +1,6 @@
-
 import { useState, useRef } from 'react';
 import { PipelineState, PipelineStep } from '../types';
-import { API_ENDPOINTS, TIMEOUTS } from '../src/config';
+import { generateManifestation as generateManifestationService } from '../services/apiService';
 
 const initialState: PipelineState = {
   processFile: null,
@@ -28,43 +27,33 @@ export const useManifestationPipeline = () => {
   const cancelGeneration = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
+      setState(s => ({ ...initialState, status: 'idle', error: 'Processo cancelado pelo usuário.' }));
     }
   };
 
-  const generateManifestation = async (file: File, userInstructions: string, agentId: string) => {
+  const generateManifestation = async (file: File, userInstructions: string, userAgentId: string) => {
     abortControllerRef.current = new AbortController();
-    const { signal } = abortControllerRef.current;
 
-    setState({ ...initialState, processFile: file, instructions: userInstructions, status: 'processing', pipelineStatus: PipelineStep.UPLOADING });
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('instructions', userInstructions);
-    formData.append('agentId', agentId);
+    setState({
+      ...initialState,
+      processFile: file,
+      instructions: userInstructions,
+      status: 'processing',
+      pipelineStatus: PipelineStep.UPLOADING
+    });
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), TIMEOUTS.generation);
+      const data = await generateManifestationService(
+        file,
+        userInstructions,
+        userAgentId,
+        abortControllerRef.current.signal
+      );
 
-      const response = await fetch(API_ENDPOINTS.generate, {
-        method: 'POST',
-        body: formData,
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Falha na comunicação com o servidor.');
-      }
-
-      const data = await response.json();
-
-      setState(s => ({ ...s, status: 'success', result: data.result, error: null }));
+      setState(s => ({ ...s, status: 'success', result: data.manifestacao, error: null })); // Acessando data.manifestacao
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
-        setState(s => ({ ...initialState, status: 'idle', error: 'Processo cancelado pelo usuário.' }));
+        // O cancelamento já é tratado no `cancelGeneration`, então podemos apenas retornar
         return;
       }
 

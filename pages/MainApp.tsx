@@ -1,18 +1,18 @@
 import React, { useState, lazy, Suspense } from 'react';
 import { useManifestationPipeline } from '../hooks/useManifestationPipeline';
-import { useAgents } from '../hooks/useAgents';
+import { useUserAgents } from '../hooks/useUserAgents'; // MUDANÇA
 import { Sidebar } from '../components/Sidebar';
 import { Step } from '../components/Step';
 import { FileUpload } from '../components/FileUpload';
 import { Loader } from '../components/Loader';
 import { DocumentIcon } from '../components/icons/DocumentIcon';
 import { MagicIcon } from '../components/icons/MagicIcon';
-import { Agent } from '../types';
+import { UserAgent } from '../types'; // MUDANÇA
 
 // Lazy loading para componentes pesados
 const ResultPanel = lazy(() => import('../components/ResultPanel'));
-const AgentModal = lazy(() => import('../components/AgentModal'));
-const ConfirmationModal = lazy(() => import('../components/ConfirmationModal'));
+// const AgentModal = lazy(() => import('../components/AgentModal')); // TODO: Reativar quando o backend de treino estiver pronto
+// const ConfirmationModal = lazy(() => import('../components/ConfirmationModal')); // TODO: Reativar
 
 const MainApp: React.FC = () => {
   const {
@@ -23,15 +23,17 @@ const MainApp: React.FC = () => {
     cancelGeneration,
   } = useManifestationPipeline();
   
-  const { agents, activeAgent, selectAgent, addAgent, deleteAgent, isLoading: agentsLoading, error: agentsError } = useAgents();
+  // MUDANÇA para useUserAgents
+  const { userAgents, activeUserAgent, selectUserAgent, isLoading: agentsLoading, error: agentsError } = useUserAgents();
 
-  const [isAgentModalOpen, setIsAgentModalOpen] = useState(false);
-  const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
+  // const [isAgentModalOpen, setIsAgentModalOpen] = useState(false); // TODO: Reativar
+  // const [agentToDelete, setAgentToDelete] = useState<UserAgent | null>(null); // MUDANÇA
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (pipelineState.processFile && activeAgent) {
-      generateManifestation(pipelineState.processFile, pipelineState.instructions, activeAgent.id);
+    if (pipelineState.processFile && activeUserAgent) {
+      // MUDANÇA para passar o ID do UserAgent
+      generateManifestation(pipelineState.processFile, pipelineState.instructions, activeUserAgent.id);
     }
   };
 
@@ -39,16 +41,16 @@ const MainApp: React.FC = () => {
     window.location.reload();
   }
 
-  const handleDeleteRequest = (agent: Agent) => {
-    setAgentToDelete(agent);
-  };
+  // const handleDeleteRequest = (agent: UserAgent) => { // MUDANÇA
+  //   setAgentToDelete(agent);
+  // };
 
-  const confirmDelete = async () => {
-    if (agentToDelete) {
-      await deleteAgent(agentToDelete.id);
-      setAgentToDelete(null);
-    }
-  };
+  // const confirmDelete = async () => {
+  //   if (agentToDelete) {
+  //     // await deleteAgent(agentToDelete.id); // TODO: Implementar delete
+  //     setAgentToDelete(null);
+  //   }
+  // };
 
   const isProcessing = pipelineState.status === 'processing';
   const isIdle = pipelineState.status === 'idle';
@@ -57,11 +59,11 @@ const MainApp: React.FC = () => {
   return (
     <div className="flex h-screen font-sans">
       <Sidebar
-        agents={agents}
-        activeAgent={activeAgent}
-        onSelectAgent={selectAgent}
-        onAddAgent={() => setIsAgentModalOpen(true)}
-        onDeleteAgent={handleDeleteRequest}
+        agents={userAgents} // MUDANÇA
+        activeAgent={activeUserAgent} // MUDANÇA
+        onSelectAgent={selectUserAgent} // MUDANÇA
+        // onAddAgent={() => setIsAgentModalOpen(true)} // TODO: Reativar
+        // onDeleteAgent={handleDeleteRequest} // TODO: Reativar
         isLoading={agentsLoading}
         error={agentsError}
       />
@@ -130,7 +132,7 @@ const MainApp: React.FC = () => {
                 <button
                   type="submit"
                   className="btn-primary px-8 py-3 text-white font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none"
-                  disabled={!pipelineState.processFile || isProcessing}
+                  disabled={!pipelineState.processFile || !activeUserAgent || isProcessing} // MUDANÇA: desabilitar se não houver agente ativo
                 >
                   {isProcessing ? 'Processando...' : 'Gerar Manifestação'}
                 </button>
@@ -140,6 +142,7 @@ const MainApp: React.FC = () => {
         </div>
       </main>
       
+      {/* TODO: Reativar Modais
       <Suspense fallback={null}>
         <AgentModal
           isOpen={isAgentModalOpen}
@@ -158,6 +161,7 @@ const MainApp: React.FC = () => {
           confirmText="Excluir"
         />
       </Suspense>
+      */}
     </div>
   );
 };

@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
         }
       },
       optimizeDeps: {
-        include: ['pdfjs-dist', 'tesseract.js', 'jspdf', 'docx']
+        include: ['pdfjs-dist', 'jspdf', 'docx'] // Removido 'tesseract.js'
       },
       build: {
         rollupOptions: {
@@ -22,14 +22,8 @@ export default defineConfig(({ mode }) => {
               // React core em chunk separado
               'react-vendor': ['react', 'react-dom'],
 
-              // Bibliotecas de processamento de documentos (pesadas)
-              'pdf-processing': ['pdfjs-dist', 'tesseract.js'],
-
-              // Bibliotecas de exportação
-              'document-export': ['jspdf', 'docx'],
-
-              // Google Gemini SDK
-              'genai': ['@google/genai']
+              // Bibliotecas de exportação e PDF
+              'document-libs': ['jspdf', 'docx', 'pdfjs-dist'],
             }
           }
         },

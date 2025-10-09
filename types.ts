@@ -20,9 +20,28 @@ export interface PipelineState {
   ocrProgress: number | null;
 }
 
+/**
+ * @deprecated Use UserAgent instead. This is part of the legacy system.
+ */
 export interface Agent {
   id: string;
   name: string;
   systemInstruction: string;
   category?: string;
+}
+
+// Novo tipo para o sistema de agentes treináveis
+export interface UserAgent {
+  id: string;
+  name: string;
+  description?: string | null;
+  category: string;
+  systemInstruction: string; // A instrução gerada pelo treinamento
+  isTrained: boolean;
+  qualityScore?: number | null;
+  usageCount: number;
+  lastUsed?: string | null; // Data como string ISO
+  isActive: boolean;
+  createdAt: string; // Data como string ISO
+  updatedAt: string; // Data como string ISO
 }
